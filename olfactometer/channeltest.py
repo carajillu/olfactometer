@@ -18,7 +18,7 @@ def parse():
 
     args = parser.parse_args()
     return args
-def threshold(port):
+def channeltest(port):
     ser = serial.Serial(port) #defines the port that will be used (how do we know that?)
     ser.boudrate = 9600 #sets the speed at which data will be transferred to ARDUINO (default?)
     ser.flush()
@@ -44,9 +44,9 @@ def threshold(port):
     ser.close()
  
 if __name__=="__main__":
-    print("Executing script threshold.py on its own.")
+    print("Executing script channeltest.py on its own.")
     args=parse()
     port=args.port
 else:
-    print("Importing script threshold.py as "+__name__)
-threshold(port)
+    print("Importing script channeltest.py as "+__name__)
+channeltest(port)
