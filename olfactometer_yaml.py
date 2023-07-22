@@ -45,6 +45,7 @@ def run_expt(yml,ser, total_flow, constant_flow_id, clean_air_id):
        for i in range(0,len(yml[key]["channel_id"])):
            channel_id=yml[key]["channel_id"][i]
            flow_i=yml[key]["flow"][i]
+           flow_sum=flow_sum+flow_i
            print("channel ", channel_id, " will be open at ", flow_i, " SPLM for ", time, " seconds")
            
            #setting the flow of each channel
