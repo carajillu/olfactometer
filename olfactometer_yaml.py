@@ -2,6 +2,7 @@ import serial
 import argparse
 import yaml
 import sys
+import time
 
 def parse():
     parser = argparse.ArgumentParser()
@@ -10,22 +11,20 @@ def parse():
     return args
 
 def set_parameters(yml):
-    print(yml)
     if list(yml.keys())[0]!="parameters": # In python 3, dict_keys object is not subscriptable
        print ("First key in input file is not parameters. Exiting.")
        sys.exit()
     else:
        port=yml["parameters"]["port"]
-       total_flow=yml["parameters"]["total_flow"]
+       constant_flow_rate=yml["parameters"]["constant_flow_rate"]
        constant_flow_id=yml["parameters"]["constant_flow_channel_id"]
        clean_air_id=yml["parameters"]["clean_air_channel_id"]
        print("Olfactometer will be runing from port ", port)
-       print("Total flow set to ", total_flow, " SPLM")
        print("Constant flow will come from channel ", constant_flow_id)
+       print("Constant flow will be set at ", constant_flow_rate," SPLM")
        print("Clean air will come from channel ", clean_air_id)
-       return port, total_flow, constant_flow_id, clean_air_id
-
-    
+       return port, constant_flow_rate, constant_flow_id, clean_air_id
+   
 def check_expts(yml): 
     for key in list(yml.keys())[1:]: # first key is ALWAYS the parameters   
        print("Checking step: ",key)
@@ -36,55 +35,58 @@ def check_expts(yml):
           sys.exit()
     return
 
-def run_expt(yml,ser, total_flow, constant_flow_id, clean_air_id):
+def run_expt(yml,ser, constant_flow_rate, constant_flow_id, clean_air_id):
+    # 1) Open the constant flow channel
+    cmd_str="setflow "+str(constant_flow_id)+":"+str(constant_flow_rate)+";"
+    ser_exec(ser,cmd_str)
+
+    cmd_str="setchannel "+str(constant_flow_id)
+    ser_exec(ser,cmd_str)
+
+    cmd_str="setvalve 1"
+    ser_exec(ser,cmd_str)
+
+    # 2) Run experiments 
     for key in list(yml.keys())[1:]: # first key is ALWAYS the parameters
-       flow_sum=0
-       flow_str="setflow "
-       time=yml[key]["time"]
-       constant_flow_rate=total_flow
+       
+       timeopenvalve=yml[key]["time"] #This is the time this experiment will run for
+
+       # 2.1) Calibrate flows of odorant channels (incl clean air)
+       cmd_str="setflow "
        for i in range(0,len(yml[key]["channel_id"])):
            channel_id=yml[key]["channel_id"][i]
            flow_i=yml[key]["flow"][i]
-           flow_sum=flow_sum+flow_i
-           print("channel ", channel_id, " will be open at ", flow_i, " SPLM for ", time, " seconds")
-           
+           print("channel ", channel_id, " will be open at ", flow_i, " SPLM for ", timeopenvalve, " seconds")
            #setting the flow of each channel
-           flow_str=flow_str+str(channel_id)+":"+str(flow_i)+";"
-           constant_flow_rate=constant_flow_rate-flow_i           
-           
-       if flow_sum>total_flow:
-          print("Total flow will be set to ", flow_sum, "SPLM which is larger than indicated on the parameters.")
-          print("constant flow rate will be set to 0 SPLM")
-          print("this happens when the sum of the odorant flows is larger than the specified total flow")
-       z=input("press enter to continue or ctrl+c to kill the execution")
-
-       #calculate the new rate of the constant flow and calibrate the channel flows
-       constant_flow_rate=total_flow-flow_sum
-       if constant_flow_rate>0:
-          flow_str=flow_str+str(constant_flow_id)+":"+str(constant_flow_rate)+";\r"
-          #ser.write(bytes(flow_str))
-
-       # Open the constant flow (not timed)
-       if constant_flow_rate>0:
-          cmd_str="setchannel "+str(constant_flow_id)+"\r"
-          #ser.write(bytes(cmd_str))
-          cmd_str="setvalve 1\r"
-          #ser.write(bytes(cmd_str))
+           cmd_str=cmd_str+str(channel_id)+":"+str(flow_i)+";"          
+       ser_exec(ser,cmd_str)
        
-       # Open the odorant channels (timed)
+       # 2.2) Open the odorant channels (timed)
+       time_ms=timeopenvalve*1000
        for i in range(0,len(yml[key]["channel_id"])):
            channel_id=yml[key]["channel_id"][i]
-           flow_i=yml[key]["flow"][i]
-           cmd_str="setchannel "+str(channel_id)+"\r"
-           #ser.write(bytes(cmd_str))
-           cmd_str="openvalvetimed "+str(time)+"\r"
-           #ser.write(bytes(cmd_str))          
+
+           cmd_str="setchannel "+str(channel_id)
+           ser_exec(ser,cmd_str)
+
+           cmd_str="openvalvetimed "+str(time_ms)
+           ser_exec(ser,cmd_str)
+
+           pause=int(yml[key]["pause"])
+           time.sleep(pause)
        
-       #close the constant flow
-       cmd_str="setchannel "+str(constant_flow_id)+"\r"
-       #ser.write(bytes(cmd_str))
-       cmd_str="setvalve 1\r"
-       #ser.write(bytes(cmd_str))        
+    # 3) Close the constant flow
+    cmd_str="setchannel "+str(constant_flow_id)
+    ser_exec(ser,cmd_str)
+
+    cmd_str="setvalve 0"
+    ser_exec(ser,cmd_str)
+    return
+
+def ser_exec(ser,cmd_str):
+    print("WRITING TO SERIAL: ", cmd_str)
+    if ser is not None:
+       ser.write(bytes(cmd_str+"\r"))
     return
 
 if __name__=="__main__":
@@ -97,11 +99,17 @@ if __name__=="__main__":
           print(error)
           sys.exit()
         else:
-           port, total_flow, constant_flow_id, clean_air_id=set_parameters(yml)
-           #ser = serial.Serial(port)
-           ser=None
+           port, constant_flow_rate, constant_flow_id, clean_air_id=set_parameters(yml)
+           try:
+              ser = serial.Serial(port)
+           except:
+              print("Serial Port ", port, " cannot be reached.")
+              print("Running in emulator mode.")
+              print("Press enter to continue or CTRL+C to break execution.") 
+              ser=None
+              z=input()
            check_expts(yml)
-           run_expt(yml,ser, total_flow, constant_flow_id, clean_air_id)
+           run_expt(yml,ser, constant_flow_rate, constant_flow_id, clean_air_id)
            
 
     

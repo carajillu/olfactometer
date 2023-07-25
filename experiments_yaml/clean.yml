@@ -1,0 +1,12 @@
+parameters:
+  port: "com3"
+  constant_flow_channel_id: 0
+  constant_flow_rate: 2
+  clean_air_channel_id: 13
+
+
+clean:
+  channel_id: [13]
+  flow: [2]
+  time: 10
+  pause: 10 
