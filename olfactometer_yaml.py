@@ -86,7 +86,8 @@ def run_expt(yml,ser, constant_flow_rate, constant_flow_id, clean_air_id):
 def ser_exec(ser,cmd_str):
     print("WRITING TO SERIAL: ", cmd_str)
     if ser is not None:
-       ser.write(bytes(cmd_str+"\r"))
+       cmd_bytes=(cmd_str+"\r").encode()
+       ser.write(cmd_bytes)
     return
 
 if __name__=="__main__":
