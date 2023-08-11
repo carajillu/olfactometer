@@ -18,28 +18,61 @@ def set_parameters(yml):
        port=yml["parameters"]["port"]
        constant_flow_rate=yml["parameters"]["constant_flow_rate"]
        constant_flow_id=yml["parameters"]["constant_flow_channel_id"]
-       clean_air_id=yml["parameters"]["clean_air_channel_id"]
+       calibration=yml["parameters"]["calibration"]
        print("Olfactometer will be runing from port ", port)
        print("Constant flow will come from channel ", constant_flow_id)
        print("Constant flow will be set at ", constant_flow_rate," SPLM")
-       print("Clean air will come from channel ", clean_air_id)
-       return port, constant_flow_rate, constant_flow_id, clean_air_id
-   
-def check_expts(yml): 
-    for key in list(yml.keys())[1:]: # first key is ALWAYS the parameters   
-       print("Checking step: ",key)
-       if len(yml[key]["channel_id"])==len(yml[key]["flow"]):
-          print("... Step ", key, " OK")
+       if calibration==True:
+         print("Channels will be calibrated before starting each experiment.")
        else:
-          print("... Step ", key, " malformatted. Check that channel_id, flow and time have the same number of values")
-          sys.exit()
+         print("Calibration will NOT be done for any channels. Make sure it is already done.") 
+         z=input("Press enter to continue or ctrl+C to exit.")
+       return port, constant_flow_rate, constant_flow_id, calibration
+   
+def check_expts(yml):
+    if yml["parameters"]["calibration"]==False:
+      print("Calibration has been done externally. Displayed flow rate values may not be true")
+    for key in list(yml.keys())[1:]: # first key is ALWAYS the parameters   
+       print("Checking step:",key, "...")
+       print("Run time:",yml[key]["seconds"],"seconds")
+       for channel in list(yml[key]["channels"].keys()):
+         print("Channel",channel,"will run at",yml[key]["channels"][channel],"SPLM")
     return
 
-def run_expt(yml,ser, constant_flow_rate, constant_flow_id, clean_air_id):
-    # 1) Open the constant flow channel
-    cmd_str="setflow "+str(constant_flow_id)+":"+str(constant_flow_rate)+";"
-    ser_exec(ser,cmd_str)
+def run_calibration(ser,channel,flow):
+   if ser is None:
+      print("Cannot verify calibration in emulator mode. Assuming it was successful.")
+      return True
 
+   cmd_str="setverbose 1"
+   ser_exec(cmd)
+   cmd_str="setflow "+str(channel_id)+":"+str(flow_i)+";"
+   ser.exec(cmd)
+   
+   readback=ser_listen(ser)
+   if readback is None:
+      return False
+
+   if ("Result" in readback):
+      print (readback)
+      readback=ser_listen(ser)
+      if readback is None:
+         return False
+      if ("*OK" in readback):
+         print('Calibration completed successfully')
+         return True
+
+def run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration):
+    # 0) Calibrate the constant flow channel if required
+    if calibration is True:
+       print("calibrating constant flow")
+       outcome=run_calibration(ser,constant_flow_id,constant_flow_rate)
+       print(outcome)
+       if outcome is False:
+          print("constant flow calibration failed. Exiting.")
+          return
+
+    # 1) Open constant flow
     cmd_str="setchannel "+str(constant_flow_id)
     ser_exec(ser,cmd_str)
 
@@ -48,32 +81,32 @@ def run_expt(yml,ser, constant_flow_rate, constant_flow_id, clean_air_id):
 
     # 2) Run experiments 
     for key in list(yml.keys())[1:]: # first key is ALWAYS the parameters
-       
-       timeopenvalve=yml[key]["time"] #This is the time this experiment will run for
+       z=input("Press Enter to start: "+key)
+       timeopenvalve=yml[key]["seconds"] #This is the time this experiment will run for
 
-       # 2.1) Calibrate flows of odorant channels (incl clean air)
-       cmd_str="setflow "
-       for i in range(0,len(yml[key]["channel_id"])):
-           channel_id=yml[key]["channel_id"][i]
-           flow_i=yml[key]["flow"][i]
-           print("channel ", channel_id, " will be open at ", flow_i, " SPLM for ", timeopenvalve, " seconds")
-           #setting the flow of each channel
-           cmd_str=cmd_str+str(channel_id)+":"+str(flow_i)+";"          
-       ser_exec(ser,cmd_str)
+       # 2.1) Calibrate flows of odorant channels if required
+       if calibration is True:
+          print("calibrating odorant channels")
+          for channel in list(yml[key]["channels"].keys()):
+              flow=yml[key]["channels"][channel]
+              outcome=run_calibration(ser,channel,flow)
+              print(channel,flow,outcome)
+              if outcome is False:
+                 print("Calibration of channel",channel,"failed. Exiting.")
+                 return
        
        # 2.2) Open the odorant channels (timed)
        time_ms=timeopenvalve*1000
-       for i in range(0,len(yml[key]["channel_id"])):
-           channel_id=yml[key]["channel_id"][i]
-
+       for channel_id in list(yml[key]["channels"].keys()):
            cmd_str="setchannel "+str(channel_id)
            ser_exec(ser,cmd_str)
 
            cmd_str="openvalvetimed "+str(time_ms)
            ser_exec(ser,cmd_str)
-
-           pause=int(yml[key]["pause"])
-           time.sleep(pause)
+      
+       # 2.3) Once all commands are submitted, wait for the execution time + 10 seconds to catch up. 
+       time.sleep(timeopenvalve+10)
+           
        
     # 3) Close the constant flow
     cmd_str="setchannel "+str(constant_flow_id)
@@ -90,27 +123,40 @@ def ser_exec(ser,cmd_str):
        ser.write(cmd_bytes)
     return
 
+def ser_listen(ser):
+   readback=None
+   waiting_time=0
+   readback = ser.readline().decode('utf-8')
+   while(readback is None):
+      readback = ser.readline().decode('utf-8')
+      time.sleep(1)
+      waiting_time+=1
+      if waiting_time>60:
+         print("instrument is taking too long to reply. Aborting.")
+         break
+   return readback
+      
 if __name__=="__main__":
     args=parse()
     with open(args.input, 'r') as file:
         try:
           yml = yaml.safe_load(file)
+          print(yml)
         except Exception as error:
           print("The input file has formatting errors.")
           print(error)
           sys.exit()
         else:
-           port, constant_flow_rate, constant_flow_id, clean_air_id=set_parameters(yml)
+           port, constant_flow_rate, constant_flow_id, calibration=set_parameters(yml)
            try:
               ser = serial.Serial(port)
            except:
               print("Serial Port ", port, " cannot be reached.")
               print("Running in emulator mode.")
-              print("Press enter to continue or CTRL+C to break execution.") 
               ser=None
-              z=input()
+              z=input("Press enter to continue or CTRL+C to break execution.")
            check_expts(yml)
-           run_expt(yml,ser, constant_flow_rate, constant_flow_id, clean_air_id)
+           run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration)
            
 
     
