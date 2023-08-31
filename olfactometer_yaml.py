@@ -97,12 +97,8 @@ def run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration):
        
        # 2.2) Open the odorant channels (timed)
        time_ms=timeopenvalve*1000
-       for channel_id in list(yml[key]["channels"].keys()):
-           cmd_str="setchannel "+str(channel_id)
-           ser_exec(ser,cmd_str)
-
-           cmd_str="openvalvetimed "+str(time_ms)
-           ser_exec(ser,cmd_str)
+       cmd_str="openmultivalvetimed "+str(time_ms)+" "+";".join(map(str,list(yml[key]["channels"].keys())))
+       ser_exec(ser,cmd_str)
       
        # 2.3) Once all commands are submitted, wait for the execution time + 10 seconds to catch up. 
        time.sleep(timeopenvalve+10)
