@@ -1,0 +1,10 @@
+parameters:
+  port: "com3"
+  constant_flow_channel_id: 0
+  constant_flow_rate: 2
+  calibration: no
+
+clean:
+  seconds: 20
+  channels:
+    13: 1
