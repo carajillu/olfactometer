@@ -107,14 +107,15 @@ def ser_exec(ser,cmd_str):
     cmd_bytes=(cmd_str+"\r").encode()
     ser.write(cmd_bytes)
        
+    result=False   
     readback=ser_listen(ser)
     if readback is None:
-       result=False
+       pass
     elif ("Result" in readback):
        print (readback)
        readback=ser_listen(ser)
        if readback is None:
-         result=False
+         pass
        elif ("*OK" in readback):
          result=True
     
