@@ -126,10 +126,10 @@ def ser_exec(ser,cmd_str):
        return result
 
 def ser_listen(ser):
-   readback=None
+   readback="\r\n"
    waiting_time=0
    readback = ser.readline().decode('utf-8')
-   while(readback is None):
+   while(readback is "\r\n"):
       readback = ser.readline().decode('utf-8')
       time.sleep(1)
       waiting_time+=1
