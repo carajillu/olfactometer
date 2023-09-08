@@ -106,6 +106,9 @@ def ser_exec(ser,cmd_str):
 
     cmd_bytes=(cmd_str+"\r").encode()
     ser.write(cmd_bytes)
+    
+    print ("Command verificaion is not working yet. Assuming success.")
+    return True
 
     result=False   
     readback=ser_listen(ser)
