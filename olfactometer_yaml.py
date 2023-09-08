@@ -39,45 +39,31 @@ def check_expts(yml):
          print("Channel",channel,"will run at",yml[key]["channels"][channel],"SPLM")
     return
 
-def run_calibration(ser,channel,flow):
-   if ser is None:
-      print("Cannot verify calibration in emulator mode. Assuming it was successful.")
-      return True
-
-   cmd_str="setverbose 1"
-   ser_exec(cmd)
-   cmd_str="setflow "+str(channel_id)+":"+str(flow_i)+";"
-   ser.exec(cmd)
-   
-   readback=ser_listen(ser)
-   if readback is None:
-      return False
-
-   if ("Result" in readback):
-      print (readback)
-      readback=ser_listen(ser)
-      if readback is None:
-         return False
-      if ("*OK" in readback):
-         print('Calibration completed successfully')
-         return True
+def run_calibration(ser,channel_id,flow):
+   cmd_str="setflow "+str(channel_id)+":"+str(flow)+";"
+   outcome=ser_exec(ser,cmd_str)
+   return outcome
 
 def run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration):
+    # Set the instrument to verbose so that we can veerify steps went through
+    cmd_str="setverbose 1"
+    result=ser_exec(ser,cmd_str)
+
     # 0) Calibrate the constant flow channel if required
     if calibration is True:
        print("calibrating constant flow")
        outcome=run_calibration(ser,constant_flow_id,constant_flow_rate)
-       print(outcome)
+       print(constant_flow_id,constant_flow_rate,outcome)
        if outcome is False:
           print("constant flow calibration failed. Exiting.")
           return
 
     # 1) Open constant flow
     cmd_str="setchannel "+str(constant_flow_id)
-    ser_exec(ser,cmd_str)
+    result=ser_exec(ser,cmd_str)
 
     cmd_str="setvalve 1"
-    ser_exec(ser,cmd_str)
+    result=ser_exec(ser,cmd_str)
 
     # 2) Run experiments 
     for key in list(yml.keys())[1:]: # first key is ALWAYS the parameters
@@ -98,7 +84,7 @@ def run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration):
        # 2.2) Open the odorant channels (timed)
        time_ms=timeopenvalve*1000
        cmd_str="openmultivalvetimed "+str(time_ms)+" "+";".join(map(str,list(yml[key]["channels"].keys())))
-       ser_exec(ser,cmd_str)
+       result=ser_exec(ser,cmd_str)
       
        # 2.3) Once all commands are submitted, wait for the execution time + 10 seconds to catch up. 
        time.sleep(timeopenvalve+10)
@@ -106,18 +92,37 @@ def run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration):
        
     # 3) Close the constant flow
     cmd_str="setchannel "+str(constant_flow_id)
-    ser_exec(ser,cmd_str)
+    result=ser_exec(ser,cmd_str)
 
     cmd_str="setvalve 0"
-    ser_exec(ser,cmd_str)
+    result=ser_exec(ser,cmd_str)
     return
 
 def ser_exec(ser,cmd_str):
     print("WRITING TO SERIAL: ", cmd_str)
-    if ser is not None:
-       cmd_bytes=(cmd_str+"\r").encode()
-       ser.write(cmd_bytes)
-    return
+    if ser is None:
+       print("Cannot verify command in emulator mode. Assuming it was successful.")
+       return True
+
+    cmd_bytes=(cmd_str+"\r").encode()
+    ser.write(cmd_bytes)
+       
+    readback=ser_listen(ser)
+    if readback is None:
+       result=False
+    elif ("Result" in readback):
+       print (readback)
+       readback=ser_listen(ser)
+       if readback is None:
+         result=False
+       elif ("*OK" in readback):
+         result=True
+    
+    if result==False:
+       print("COMMAND FAILED. EXITING.")
+       sys.exit()
+    else:
+       return result
 
 def ser_listen(ser):
    readback=None
