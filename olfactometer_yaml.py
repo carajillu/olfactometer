@@ -46,7 +46,7 @@ def run_calibration(ser,channel_id,flow):
 
 def run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration):
     # Set the instrument to verbose so that we can veerify steps went through
-    cmd_str="setverbose 1"
+    cmd_str="setverbose 2"
     result=ser_exec(ser,cmd_str)
 
     # 0) Calibrate the constant flow channel if required
@@ -106,7 +106,7 @@ def ser_exec(ser,cmd_str):
 
     cmd_bytes=(cmd_str+"\r").encode()
     ser.write(cmd_bytes)
-       
+
     result=False   
     readback=ser_listen(ser)
     if readback is None:
@@ -152,6 +152,8 @@ if __name__=="__main__":
            port, constant_flow_rate, constant_flow_id, calibration=set_parameters(yml)
            try:
               ser = serial.Serial(port)
+              ser.boudrate=9600
+              ser.flush()
            except:
               print("Serial Port ", port, " cannot be reached.")
               print("Running in emulator mode.")
