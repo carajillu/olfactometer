@@ -51,6 +51,7 @@ def run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration):
 
     # 0) Calibrate the constant flow channel if required
     if calibration is True:
+       z=input("Please attach output tubes to calibration ports and press enter")
        print("calibrating constant flow")
        outcome=run_calibration(ser,constant_flow_id,constant_flow_rate)
        print(constant_flow_id,constant_flow_rate,outcome)
@@ -72,14 +73,17 @@ def run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration):
 
        # 2.1) Calibrate flows of odorant channels if required
        if calibration is True:
+          z=input("Please attach output tubes to calibration ports and press enter")
           print("calibrating odorant channels")
           for channel in list(yml[key]["channels"].keys()):
               flow=yml[key]["channels"][channel]
               outcome=run_calibration(ser,channel,flow)
+              time.sleep(5) # wait while instrument is being calibrated
               print(channel,flow,outcome)
               if outcome is False:
                  print("Calibration of channel",channel,"failed. Exiting.")
                  return
+          z=input("Calibration complete. Please reattach the output tubes to the nose piece and press enter.")
        
        # 2.2) Open the odorant channels (timed)
        time_ms=timeopenvalve*1000
@@ -109,7 +113,7 @@ def ser_exec(ser,cmd_str):
     
     print ("Command verificaion is not working yet. Assuming success.")
     return True
-
+    time.sleep(1) # waiting for the instrument to send output (just 1 sec)
     result=False   
     readback=ser_listen(ser)
     if readback is None:
