@@ -39,80 +39,73 @@ def check_expts(yml):
          print("Channel",channel,"will run at",yml[key]["channels"][channel],"SPLM")
     return
 
-def run_calibration(ser,channel_id,flow):
-   cmd_str="setflow "+str(channel_id)+":"+str(flow)+";"
-   outcome=ser_exec(ser,cmd_str)
-   return outcome
+def run_calibration(ser,yml):
+   channels=[yml["parameters"]["constant_flow_channel_id"]]
+   flows=[yml["parameters"]["constant_flow_rate"]]
+   for key in list(yml.keys())[1:]:
+      for channel in list(yml[key]["channels"].keys()):
+         channels.append(channel)
+         flows.append(yml[key]["channels"][channel])
+   
+   print(channels)
+   print(flows)
+   
+   cmd_str="setflow "
+   for i in range(0,len(channels)):
+       cmd_str+=str(channels[i])+":"+str(flows[i])+";"
+
+   z=input("Please attach output tubes to calibration ports and press enter")
+   print("calibrating odorant channels") 
+   ser_exec(ser,cmd_str)
+   outcome=check_cmd_success(ser)
+   if outcome is False:
+      print("Calibration of channel",channel,"failed. Exiting.")
+      return False
+   z=input("Calibration complete. Please reattach the output tubes to the nose piece and press enter.")
+   return True
 
 def run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration):
-    # Set the instrument to verbose so that we can veerify steps went through
-    cmd_str="setverbose 2"
-    result=ser_exec(ser,cmd_str)
-
-    # 0) Calibrate the constant flow channel if required
-    if calibration is True:
-       z=input("Please attach output tubes to calibration ports and press enter")
-       print("calibrating constant flow")
-       outcome=run_calibration(ser,constant_flow_id,constant_flow_rate)
-       print(constant_flow_id,constant_flow_rate,outcome)
-       if outcome is False:
-          print("constant flow calibration failed. Exiting.")
-          return
 
     # 1) Open constant flow
     cmd_str="setchannel "+str(constant_flow_id)
-    result=ser_exec(ser,cmd_str)
+    ser_exec(ser,cmd_str)
 
     cmd_str="setvalve 1"
-    result=ser_exec(ser,cmd_str)
+    ser_exec(ser,cmd_str)
 
     # 2) Run experiments 
     for key in list(yml.keys())[1:]: # first key is ALWAYS the parameters
        z=input("Press Enter to start: "+key)
        timeopenvalve=yml[key]["seconds"] #This is the time this experiment will run for
-
-       # 2.1) Calibrate flows of odorant channels if required
-       if calibration is True:
-          z=input("Please attach output tubes to calibration ports and press enter")
-          print("calibrating odorant channels")
-          for channel in list(yml[key]["channels"].keys()):
-              flow=yml[key]["channels"][channel]
-              outcome=run_calibration(ser,channel,flow)
-              time.sleep(5) # wait while instrument is being calibrated
-              print(channel,flow,outcome)
-              if outcome is False:
-                 print("Calibration of channel",channel,"failed. Exiting.")
-                 return
-          z=input("Calibration complete. Please reattach the output tubes to the nose piece and press enter.")
-       
-       # 2.2) Open the odorant channels (timed)
+              
+       # 2.1) Open the odorant channels (timed)
        time_ms=timeopenvalve*1000
        cmd_str="openmultivalvetimed "+str(time_ms)+" "+";".join(map(str,list(yml[key]["channels"].keys())))
-       result=ser_exec(ser,cmd_str)
+       ser_exec(ser,cmd_str)
       
-       # 2.3) Once all commands are submitted, wait for the execution time + 10 seconds to catch up. 
+       # 2.2) Once all commands are submitted, wait for the execution time + 10 seconds to catch up. 
        time.sleep(timeopenvalve+10)
            
        
     # 3) Close the constant flow
     cmd_str="setchannel "+str(constant_flow_id)
-    result=ser_exec(ser,cmd_str)
+    ser_exec(ser,cmd_str)
 
     cmd_str="setvalve 0"
-    result=ser_exec(ser,cmd_str)
+    ser_exec(ser,cmd_str)
     return
 
 def ser_exec(ser,cmd_str):
     print("WRITING TO SERIAL: ", cmd_str)
     if ser is None:
-       print("Cannot verify command in emulator mode. Assuming it was successful.")
-       return True
-
+       return
     cmd_bytes=(cmd_str+"\r").encode()
     ser.write(cmd_bytes)
     
-    print ("Command verificaion is not working yet. Assuming success.")
-    return True
+def check_cmd_success(ser):    
+    if ser is None:
+       print ("Command verification not available in emulator mode. Assuming success.")
+       return True
     time.sleep(1) # waiting for the instrument to send output (just 1 sec)
     result=False   
     readback=ser_listen(ser)
@@ -139,7 +132,7 @@ def ser_listen(ser):
       readback = ser.readline().decode('utf-8')
       time.sleep(1)
       waiting_time+=1
-      if waiting_time>60:
+      if waiting_time>300:
          print("instrument is taking too long to reply. Aborting.")
          break
    return readback
@@ -160,12 +153,23 @@ if __name__=="__main__":
               ser = serial.Serial(port)
               ser.boudrate=9600
               ser.flush()
+              # Set the instrument to verbose so that we can veerify steps went through
            except:
               print("Serial Port ", port, " cannot be reached.")
               print("Running in emulator mode.")
               ser=None
               z=input("Press enter to continue or CTRL+C to break execution.")
+           
            check_expts(yml)
+           
+           cmd_str="setverbose 1"
+           ser_exec(ser,cmd_str)
+           
+           if calibration is True:
+              outcome=run_calibration(ser,yml)
+              if outcome is False:
+                 print ("Calibration falied. Exiting.")
+                 sys.exit()
            run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration)
            
 
