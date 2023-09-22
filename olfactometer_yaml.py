@@ -128,8 +128,10 @@ def check_cmd_success(ser):
 def ser_listen(ser):
    waiting_time=0
    readback = ser.readline().decode('utf-8')
+   print(readback)
    while("Result" not in readback):
       readback = ser.readline().decode('utf-8')
+      print(readback)
       time.sleep(1)
       waiting_time+=1
       if waiting_time>300:
