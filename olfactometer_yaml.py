@@ -106,38 +106,24 @@ def check_cmd_success(ser):
     if ser is None:
        print ("Command verification not available in emulator mode. Assuming success.")
        return True
-    time.sleep(1) # waiting for the instrument to send output (just 1 sec)
-    result=False   
-    readback=ser_listen(ser)
-    if readback is None:
-       pass
-    elif ("Result" in readback):
-       print (readback)
-       readback=ser_listen(ser)
-       if readback is None:
-         pass
-       elif ("*OK" in readback):
-         result=True
+    time.sleep(1) # waiting for the instrument to send output (just 1 sec)  
+    readback = ser.readline().decode('utf-8')
+    print(readback)
+    while (("*OK" not in readback) and ("*NOK" not in readback)):
+       readback = ser.readline().decode('utf-8')
+       print(readback)
+       time.sleep(1)
+
+    if ("*OK" in readback):
+       result=True
+    elif ("*NOK" in readback):
+       result=False
     
     if result==False:
        print("COMMAND FAILED. EXITING.")
        sys.exit()
     else:
        return result
-
-def ser_listen(ser):
-   waiting_time=0
-   readback = ser.readline().decode('utf-8')
-   print(readback)
-   while("Result" not in readback):
-      readback = ser.readline().decode('utf-8')
-      print(readback)
-      time.sleep(1)
-      waiting_time+=1
-      if waiting_time>300:
-         print("instrument is taking too long to reply. Aborting.")
-         break
-   return readback
       
 if __name__=="__main__":
     args=parse()
