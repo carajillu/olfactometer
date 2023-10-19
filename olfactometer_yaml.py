@@ -87,7 +87,7 @@ def run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration):
        ser_exec(ser,cmd_str)
       
        # 2.2) Once all commands are submitted, wait for the execution time + 10 seconds to catch up. 
-       time.sleep(timeopenvalve+10)
+       time.sleep(timeopenvalve+5)
            
        
     # 3) Close the constant flow
