@@ -50,17 +50,20 @@ def run_calibration(ser,yml):
    print(channels)
    print(flows)
    
-   cmd_str="setflow "
-   for i in range(0,len(channels)):
-       cmd_str+=str(channels[i])+":"+str(flows[i])+";"
-
    z=input("Please attach output tubes to calibration ports and press enter")
-   print("calibrating odorant channels") 
-   ser_exec(ser,cmd_str)
-   outcome=check_cmd_success(ser)
-   if outcome is False:
-      print("Calibration of channel",channel,"failed. Exiting.")
-      return False
+   print("calibrating odorant channels one by one")
+   for i in range(0,len(channels)):
+       cmd_str="setflow "+str(channels[i])+":"+str(flows[i])+";"
+       ser_exec(ser,cmd_str)
+       outcome=check_cmd_success(ser)
+       if outcome is False:
+          z=input("Calibration of channel",channel,"failed. Do you want to continue? (y/n)").lower()
+          while (z!="y" and z!="n" and z!="yes" and z!="no"):
+             z=input("please enter y or n")
+          if (z[0]=="y"):
+             continue
+          else:
+             return False
    z=input("Calibration complete. Please reattach the output tubes to the nose piece and press enter.")
    return True
 
