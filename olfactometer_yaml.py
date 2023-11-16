@@ -159,7 +159,7 @@ if __name__=="__main__":
            port, constant_flow_rate, constant_flow_id, calibration, max_flow=set_parameters(yml)
            try:
               ser = serial.Serial(port)
-              ser.boudrate=9600
+              ser.boudrate=115200
               ser.flush()
               # Set the instrument to verbose so that we can veerify steps went through
            except:
