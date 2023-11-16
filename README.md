@@ -54,5 +54,7 @@ CONFIG FILES
    #################################################################
 
    Note the indents (spaces) before the different parameters, or seconds, or channels and then the indents before the specified channels. Those need to be preserved too. 
+
+   YAML does NOT allow 2 experiments with the same name, so make sure each of them has a different name. Otherwise, only the last one with the same name will be run and the order in which the experiments are run will probably be wrong.
    
 
