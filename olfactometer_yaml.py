@@ -36,7 +36,10 @@ def check_expts(yml):
        print("Checking step:",key, "...")
        print("Run time:",yml[key]["seconds"],"seconds")
        for channel in list(yml[key]["channels"].keys()):
-         print("Channel",channel,"will run at",yml[key]["channels"][channel],"SPLM")
+         if (yml[key]["channels"][channel]>0):
+            print("Channel",channel,"will run at",yml[key]["channels"][channel],"SPLM")
+         else:
+            print("Channel ",channel,"'s flow has been set to ",yml[key]["channels"][channel],". This channel will be skipped.")
     return
 
 def run_calibration(ser,yml):
@@ -53,6 +56,9 @@ def run_calibration(ser,yml):
    z=input("Please attach output tubes to calibration ports and press enter")
    print("calibrating odorant channels one by one")
    for i in range(0,len(channels)):
+       if (flows[i]==0):
+          print("Channel ", channels[i], " has flow set to zero. Skipping.")
+          continue
        cmd_str="setflow "+str(channels[i])+":"+str(flows[i])+";"
        ser_exec(ser,cmd_str)
        outcome=check_cmd_success(ser)
@@ -83,7 +89,12 @@ def run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration):
               
        # 2.1) Open the odorant channels (timed)
        time_ms=timeopenvalve*1000
-       cmd_str="openmultivalvetimed "+str(time_ms)+" "+";".join(map(str,list(yml[key]["channels"].keys())))
+       channels_lst=[]
+       for channel in yml[key]["channels"].keys():
+          if (yml[key]["channels"][channel]==0):
+             continue
+          channels_lst.append(channel)
+       cmd_str="openmultivalvetimed "+str(time_ms)+" "+";".join(map(str,channels_lst))
        ser_exec(ser,cmd_str)
       
        # 2.2) Once all commands are submitted, wait for the execution time + 10 seconds to catch up. 
