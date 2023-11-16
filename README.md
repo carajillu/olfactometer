@@ -33,9 +33,10 @@ CONFIG FILES
 
    parameters: # All the following parameters need to be specified.
      port: "com3" #Name of the port through which the instrument is connected to the computer
-     constant_flow_channel_id: 0Channel that will give constant flow (typically 0)
+     constant_flow_channel_id: 0 #Channel that will give constant flow (typically 0)
      constant_flow_rate: 2 #Constant flow rate in SPLM
      calibration: no #Whether or not olfactometer_yaml.py has to calibrate the channels (yes/no)
+     max_flow: 6 #maximum flow that is gonna go through the system, total flow should not exceed that
 
    step1:
      seconds: 20 #Time in seconds that this step will run for (always +10 to catch up)

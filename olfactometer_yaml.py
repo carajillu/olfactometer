@@ -19,6 +19,7 @@ def set_parameters(yml):
        constant_flow_rate=yml["parameters"]["constant_flow_rate"]
        constant_flow_id=yml["parameters"]["constant_flow_channel_id"]
        calibration=yml["parameters"]["calibration"]
+       max_flow=yml["parameters"]["max_flow"]
        print("Olfactometer will be runing from port ", port)
        print("Constant flow will come from channel ", constant_flow_id)
        print("Constant flow will be set at ", constant_flow_rate," SPLM")
@@ -27,7 +28,7 @@ def set_parameters(yml):
        else:
          print("Calibration will NOT be done for any channels. Make sure it is already done.") 
          z=input("Press enter to continue or ctrl+C to exit.")
-       return port, constant_flow_rate, constant_flow_id, calibration
+       return port, constant_flow_rate, constant_flow_id, calibration, max_flow
    
 def check_expts(yml):
     if yml["parameters"]["calibration"]==False:
@@ -35,11 +36,16 @@ def check_expts(yml):
     for key in list(yml.keys())[1:]: # first key is ALWAYS the parameters   
        print("Checking step:",key, "...")
        print("Run time:",yml[key]["seconds"],"seconds")
+       total_flow=0
        for channel in list(yml[key]["channels"].keys()):
          if (yml[key]["channels"][channel]>0):
             print("Channel",channel,"will run at",yml[key]["channels"][channel],"SPLM")
+            total_flow=total_flow+yml[key]["channels"][channel]
          else:
             print("Channel ",channel,"'s flow has been set to ",yml[key]["channels"][channel],". This channel will be skipped.")
+       if (total_flow>max_flow):
+          print("The total flow for experiment",key,"is set to",total_flow,". Max flow is",max_flow,". Press Enter to continue or ctrl+C to abort execution.")
+          z=input()
     return
 
 def run_calibration(ser,yml):
@@ -150,7 +156,7 @@ if __name__=="__main__":
           print(error)
           sys.exit()
         else:
-           port, constant_flow_rate, constant_flow_id, calibration=set_parameters(yml)
+           port, constant_flow_rate, constant_flow_id, calibration, max_flow=set_parameters(yml)
            try:
               ser = serial.Serial(port)
               ser.boudrate=9600

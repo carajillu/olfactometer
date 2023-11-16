@@ -3,6 +3,7 @@ parameters:
   constant_flow_channel_id: 0
   constant_flow_rate: 2
   calibration: yes
+  max_flow: 6
 
 clean:
   seconds: 20
@@ -12,8 +13,8 @@ clean:
 test1:
   seconds: 20
   channels:
-    1: 1
-    2: 1
+    1: 3
+    2: 4
     3: 0 #This will be skipped
 
       
