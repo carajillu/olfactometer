@@ -1,6 +1,14 @@
 # olfactometer
 Python program to automate olfactometer experiments.
 
+CONTENTS:
+   - olfactometer_yaml.py: main code. Takes in a yaml file and executes the instructions on it. DO. NOT. MODIFY.
+   - experiments_yaml/:
+          - clean.yml: example config file. DO. NOT. MODIFY.
+          - expt1.yml: example config file. DO. NOT. MODIFY.
+          
+   All other files are not used an might be removed at a later release. 
+
 DEPENDENCIES
    - Anaconda: python environment for installing and using scientific software. 
      Installation instructions can be found at www.anaconda.org.
@@ -36,10 +44,12 @@ CONFIG FILES
      constant_flow_channel_id: 0 #Channel that will give constant flow (typically 0)
      constant_flow_rate: 2 #Constant flow rate in SPLM
      calibration: no #Whether or not olfactometer_yaml.py has to calibrate the channels (yes/no)
+     run: yes #Whether or not to run experiment steps (useful if you only want to calibrate)
      max_flow: 6 #maximum flow that is gonna go through the system, total flow should not exceed that
+     pause: #pause between steps to let the computer catch up with the instrument. 
 
    step1:
-     seconds: 20 #Time in seconds that this step will run for (always +10 to catch up)
+     seconds: 20 #Time in seconds that this step will run for (always +1 to catch up)
      channels: # Nothing after the colon. on the lines below
       1: 1    # CHANNEL_ID: FLOW
       2: 1
