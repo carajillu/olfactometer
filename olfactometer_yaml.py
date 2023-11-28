@@ -19,7 +19,9 @@ def set_parameters(yml):
        constant_flow_rate=yml["parameters"]["constant_flow_rate"]
        constant_flow_id=yml["parameters"]["constant_flow_channel_id"]
        calibration=yml["parameters"]["calibration"]
+       run=yml["parameters"]["run"]
        max_flow=yml["parameters"]["max_flow"]
+       pause=yml["parameters"]["pause"]
        print("Olfactometer will be runing from port ", port)
        print("Constant flow will come from channel ", constant_flow_id)
        print("Constant flow will be set at ", constant_flow_rate," SPLM")
@@ -28,7 +30,7 @@ def set_parameters(yml):
        else:
          print("Calibration will NOT be done for any channels. Make sure it is already done.") 
          z=input("Press enter to continue or ctrl+C to exit.")
-       return port, constant_flow_rate, constant_flow_id, calibration, max_flow
+       return port, constant_flow_rate, constant_flow_id, calibration, run, max_flow, pause
    
 def check_expts(yml):
     if yml["parameters"]["calibration"]==False:
@@ -36,7 +38,7 @@ def check_expts(yml):
     for key in list(yml.keys())[1:]: # first key is ALWAYS the parameters   
        print("Checking step:",key, "...")
        print("Run time:",yml[key]["seconds"],"seconds")
-       total_flow=0
+       total_flow=yml["parameters"]["constant_flow_rate"]
        for channel in list(yml[key]["channels"].keys()):
          if (yml[key]["channels"][channel]>0):
             print("Channel",channel,"will run at",yml[key]["channels"][channel],"SPLM")
@@ -53,6 +55,11 @@ def run_calibration(ser,yml):
    flows=[yml["parameters"]["constant_flow_rate"]]
    for key in list(yml.keys())[1:]:
       for channel in list(yml[key]["channels"].keys()):
+         if channel in channels:
+            print("Channel "+str(channel)+" has been specified more than once. Only the first instance will be taken into account")
+            print("This is normal if you are using same channels at different steps")
+            z=input("Please press enter to confirm.")
+            continue
          channels.append(channel)
          flows.append(yml[key]["channels"][channel])
    
@@ -79,7 +86,30 @@ def run_calibration(ser,yml):
    z=input("Calibration complete. Please reattach the output tubes to the nose piece and press enter.")
    return True
 
-def run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration):
+def run_step(yml, key):
+    z=input("Press Enter to start step \""+key+"\", or type \"skip\" and press enter to skip it\n")
+    if (z=="skip"):
+       print("skipping step ",key)
+       return
+    
+    timeopenvalve=yml[key]["seconds"] #This is the time this experiment will run for
+          
+    # 2.1) Open the odorant channels (timed)
+    time_ms=timeopenvalve*1000
+    channels_lst=[]
+    for channel in yml[key]["channels"].keys():
+       if (yml[key]["channels"][channel]==0):
+          continue
+       channels_lst.append(channel)
+    cmd_str="openmultivalvetimed "+str(time_ms)+" "+";".join(map(str,channels_lst))
+    ser_exec(ser,cmd_str)
+   
+    # 2.2) Once all commands are submitted, wait for the execution time + 10 seconds to catch up.
+    print("Pausing execution for",yml["parameters"]["pause"]," seconds (this is normal).")
+    time.sleep(timeopenvalve+yml["parameters"]["pause"]) 
+    return
+
+def run_expt(yml,ser,constant_flow_id):
 
     # 1) Open constant flow
     cmd_str="setchannel "+str(constant_flow_id)
@@ -90,24 +120,18 @@ def run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration):
 
     # 2) Run experiments 
     for key in list(yml.keys())[1:]: # first key is ALWAYS the parameters
-       z=input("Press Enter to start: "+key)
-       timeopenvalve=yml[key]["seconds"] #This is the time this experiment will run for
-              
-       # 2.1) Open the odorant channels (timed)
-       time_ms=timeopenvalve*1000
-       channels_lst=[]
-       for channel in yml[key]["channels"].keys():
-          if (yml[key]["channels"][channel]==0):
-             continue
-          channels_lst.append(channel)
-       cmd_str="openmultivalvetimed "+str(time_ms)+" "+";".join(map(str,channels_lst))
-       ser_exec(ser,cmd_str)
-      
-       # 2.2) Once all commands are submitted, wait for the execution time + 10 seconds to catch up. 
-       time.sleep(timeopenvalve+5)
-           
-       
-    # 3) Close the constant flow
+       run_step(yml,key)
+
+    while (key!=""):       
+       key=input("Please enter the name of a previous step if you wish to repeat it, or press enter to finish the experiment\n")
+       if (key==""):
+          continue
+       elif key in (list(yml.keys())[1:]):
+          run_step(yml,key)
+       else:
+          print("Invalid step name. Please enter again.")
+
+    # 4) Close the constant flow
     cmd_str="setchannel "+str(constant_flow_id)
     ser_exec(ser,cmd_str)
 
@@ -156,7 +180,7 @@ if __name__=="__main__":
           print(error)
           sys.exit()
         else:
-           port, constant_flow_rate, constant_flow_id, calibration, max_flow=set_parameters(yml)
+           port, constant_flow_rate, constant_flow_id, calibration, run, max_flow,pause=set_parameters(yml)
            try:
               ser = serial.Serial(port)
               ser.boudrate=115200
@@ -178,7 +202,8 @@ if __name__=="__main__":
               if outcome is False:
                  print ("Calibration falied. Exiting.")
                  sys.exit()
-           run_expt(yml,ser, constant_flow_rate, constant_flow_id, calibration)
+           if run is True:
+              run_expt(yml,ser,constant_flow_id)
            
 
     
